@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Camera Feed</title>
+  <title>Camera USB Stream</title>
 </head>
 <body>
-  <h1>Raspberry Pi Camera Feed</h1>
+  <h1>USB Camera Stream</h1>
   <img id="camera-feed" src="" width="640" height="480">
   <script>
-    // Đặt IP của Raspberry Pi vào đây
-    const raspberryPiIP = '192.168.122.24'; // Thay bằng địa chỉ IP của Raspberry Pi của bạn
+    // Đặt IP của Raspberry Pi tại đây
+    const raspberryPiIP = '192.168.122.24'; // Thay bằng địa chỉ IP của Raspberry Pi
     const ws = new WebSocket(`ws://${raspberryPiIP}:3000`);
 
     const image = document.getElementById('camera-feed');

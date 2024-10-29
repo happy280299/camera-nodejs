@@ -1,24 +1,24 @@
 // File: server.js
 const express = require('express');
 const WebSocket = require('ws');
-const { spawn } = require('child_process');
+const ffmpeg = require('fluent-ffmpeg');
 
 const app = express();
 const PORT = 3000;
 
-// Route để phục vụ file HTML hiển thị camera
+// Phục vụ file HTML để hiển thị video từ client
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html'); // File HTML sẽ được tạo trong bước tiếp theo
+  res.sendFile(__dirname + '/index.html');
 });
 
-// Khởi tạo server WebSocket để truyền dữ liệu camera
+// Khởi tạo server WebSocket để truyền video
 const server = app.listen(PORT, () => {
   console.log(`Server đang chạy tại http://192.168.122.24:${PORT}`);
 });
 
 const wss = new WebSocket.Server({ server });
 
-// Gửi dữ liệu tới tất cả các client đã kết nối
+// Gửi dữ liệu video đến tất cả các client đã kết nối
 wss.broadcast = (data) => {
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
@@ -27,20 +27,22 @@ wss.broadcast = (data) => {
   });
 };
 
-// Khởi động camera và truyền dữ liệu qua WebSocket
-const stream = spawn('raspivid', ['-o', '-', '-t', '0', '-w', '640', '-h', '480', '-fps', '24']);
+// Thiết lập ffmpeg để lấy dữ liệu từ camera USB (video0)
+const command = ffmpeg('/dev/video0')
+  .inputFormat('v4l2')
+  .format('mpeg1video')
+  .size('640x480')
+  .fps(24)
+  .videoBitrate('800k')
+  .on('start', () => {
+    console.log('Đã bắt đầu streaming từ camera USB');
+  })
+  .on('error', (err) => {
+    console.error('Lỗi ffmpeg:', err.message);
+  });
 
-// Khi có dữ liệu từ camera, gửi tới tất cả các client
-stream.stdout.on('data', (data) => {
+const ffstream = command.pipe();
+
+ffstream.on('data', (data) => {
   wss.broadcast(data);
-});
-
-// Xử lý lỗi từ camera
-stream.stderr.on('data', (data) => {
-  console.error(`Error: ${data}`);
-});
-
-// Khi camera kết thúc
-stream.on('close', () => {
-  console.log('Camera stream ended');
 });
