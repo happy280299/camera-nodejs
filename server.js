@@ -31,9 +31,9 @@ wss.broadcast = (data) => {
 const command = ffmpeg('/dev/video0')
   .inputFormat('v4l2')
   .format('mpeg1video')
-  .size('640x480')
-  .fps(24)
-  .videoBitrate('800k')
+  .size('320x240') // Lower resolution
+  .fps(15) // Lower frame rate
+  .videoBitrate('500k') // Lower bitrate
   .on('start', () => {
     console.log('Đã bắt đầu streaming từ camera USB');
   })
