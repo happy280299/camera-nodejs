@@ -1,26 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Camera Stream</title>
-  <style>
-    img {
-      width: 100%;
-      height: auto;
-    }
-  </style>
-  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
   <h1>Camera Stream</h1>
-  <img id="camera" src="" alt="Camera Stream" />
-  <script>
-    const socket = io();
-    const camera = document.getElementById("camera");
+  <img id="videoFrame" width="640" height="480" alt="Streaming video frame" />
 
-    socket.on("image", (data) => {
-      camera.src = "data:image/jpeg;base64," + data.buffer;
-    });
+  <script>
+    const socket = new WebSocket("wss://camera-nodejs.onrender.com");
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.image) {
+        const img = document.getElementById("videoFrame");
+        img.src = "data:image/jpeg;base64," + data.buffer;
+      }
+    };
+
+    socket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
   </script>
 </body>
 </html>
