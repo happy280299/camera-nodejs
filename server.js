@@ -1,67 +1,49 @@
 const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
-const NodeWebcam = require("node-webcam");
-const axios = require("axios");
+const WebSocket = require("ws");
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Configure webcam options for Raspberry Pi
-const webcamOpts = {
-  width: 1280,
-  height: 720,
-  quality: 100,
-  delay: 0,
-  saveShots: false,
-  output: "jpeg",
-  callbackReturn: "buffer",
-  verbose: false,
-  device: "/dev/video0" // or `null` to autodetect
-};
+// Connect to the Raspberry Pi through WebSocket
+const raspberryPiUrl = "ws://192.168.122.24:3000"; // Replace with Raspberry Pi WebSocket URL
+const raspberryPiSocket = new WebSocket(raspberryPiUrl);
 
-const webcam = NodeWebcam.create(webcamOpts);
+// Store the latest frame
+let latestFrame = null;
 
-// Serve static HTML page to display camera feed (optional if you have a frontend)
+// When a frame is received from Raspberry Pi
+raspberryPiSocket.on("message", (data) => {
+  latestFrame = data; // Update the latest frame with the received data
+});
+
+raspberryPiSocket.on("error", (error) => {
+  console.error("Error connecting to Raspberry Pi:", error.message);
+});
+
+// Serve static HTML for clients
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/index.html");
 });
 
-// Send image data to client every second using WebSocket
+// Serve the latest frame to connected clients
 io.on("connection", (socket) => {
   console.log("New client connected");
 
-  const captureImage = () => {
-    webcam.capture("test", (err, data) => {
-      if (err) {
-        console.log("Error capturing image:", err);
-        return;
-      }
-      socket.emit("image", { image: true, buffer: data.toString("base64") });
-    });
-  };
-
-  // Set interval to capture image every second
-  const intervalId = setInterval(captureImage, 1000);
+  // Send the latest frame every second
+  const intervalId = setInterval(() => {
+    if (latestFrame) {
+      socket.emit("image", { image: true, buffer: latestFrame });
+    }
+  }, 1000);
 
   // Cleanup on disconnect
   socket.on("disconnect", () => {
     console.log("Client disconnected");
     clearInterval(intervalId);
   });
-});
-
-// Proxy endpoint to access camera feed through Render
-app.get("/", async (req, res) => {
-  try {
-    // Replace <IP-RaspberryPi> with the actual IP or DDNS of your Raspberry Pi
-    const response = await axios.get("http://192.168.122.24:3000", { responseType: "stream" });
-    response.data.pipe(res); // Pipe the camera stream from Raspberry Pi to Render
-  } catch (error) {
-    console.error("Failed to connect to Raspberry Pi:", error.message);
-    res.status(500).send("Cannot connect to Raspberry Pi camera");
-  }
 });
 
 // Start the server
