@@ -2,12 +2,13 @@ const express = require("express");
 const http = require("http");
 const socketIo = require("socket.io");
 const NodeWebcam = require("node-webcam");
+const axios = require("axios");
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Configure webcam options
+// Configure webcam options for Raspberry Pi
 const webcamOpts = {
   width: 1280,
   height: 720,
@@ -17,23 +18,26 @@ const webcamOpts = {
   output: "jpeg",
   callbackReturn: "buffer",
   verbose: false,
-  device: "/dev/video0" // or use `null` to autodetect
+  device: "/dev/video0" // or `null` to autodetect
 };
 
 const webcam = NodeWebcam.create(webcamOpts);
 
-// Serve static HTML page to display camera feed
+// Serve static HTML page to display camera feed (optional if you have a frontend)
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/index.html");
 });
 
-// Capture images and send to client every second
+// Send image data to client every second using WebSocket
 io.on("connection", (socket) => {
   console.log("New client connected");
 
   const captureImage = () => {
-    NodeWebcam.capture("test", webcamOpts, (err, data) => {
-      if (err) return console.log(err);
+    webcam.capture("test", (err, data) => {
+      if (err) {
+        console.log("Error capturing image:", err);
+        return;
+      }
       socket.emit("image", { image: true, buffer: data.toString("base64") });
     });
   };
@@ -48,9 +52,20 @@ io.on("connection", (socket) => {
   });
 });
 
-// Start the server
-const port = process.env.PORT || 3000;
-server.listen(port, "0.0.0.0", () => {
-  console.log(`Server is running on http://localhost:${port}`);
+// Proxy endpoint to access camera feed through Render
+app.get("/camera-stream", async (req, res) => {
+  try {
+    // Replace <IP-RaspberryPi> with the actual IP or DDNS of your Raspberry Pi
+    const response = await axios.get("http://192.168.122.24:3000", { responseType: "stream" });
+    response.data.pipe(res); // Pipe the camera stream from Raspberry Pi to Render
+  } catch (error) {
+    console.error("Failed to connect to Raspberry Pi:", error.message);
+    res.status(500).send("Cannot connect to Raspberry Pi camera");
+  }
 });
 
+// Start the server
+const port = process.env.PORT || 3000;
+server.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
