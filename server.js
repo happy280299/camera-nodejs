@@ -53,7 +53,7 @@ io.on("connection", (socket) => {
 });
 
 // Proxy endpoint to access camera feed through Render
-app.get("/camera-stream", async (req, res) => {
+app.get("/", async (req, res) => {
   try {
     // Replace <IP-RaspberryPi> with the actual IP or DDNS of your Raspberry Pi
     const response = await axios.get("http://192.168.122.24:3000", { responseType: "stream" });
