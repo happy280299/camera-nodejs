@@ -1,48 +1,54 @@
-// File: server.js
-const express = require('express');
-const WebSocket = require('ws');
-const ffmpeg = require('fluent-ffmpeg');
+const express = require("express");
+const http = require("http");
+const socketIo = require("socket.io");
+const NodeWebcam = require("node-webcam");
 
 const app = express();
-const PORT = 3000;
+const server = http.createServer(app);
+const io = socketIo(server);
 
-// Phục vụ file HTML để hiển thị video từ client
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
-});
-
-// Khởi tạo server WebSocket để truyền video
-const server = app.listen(PORT, () => {
-  console.log(`Server đang chạy tại http://192.168.122.24:${PORT}`);
-});
-
-const wss = new WebSocket.Server({ server });
-
-// Gửi dữ liệu video đến tất cả các client đã kết nối
-wss.broadcast = (data) => {
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(data);
-    }
-  });
+// Configure webcam options
+const webcamOpts = {
+  width: 1280,
+  height: 720,
+  quality: 100,
+  delay: 0,
+  saveShots: false,
+  output: "jpeg",
+  callbackReturn: "buffer",
+  verbose: false,
+  device: "/dev/video0" // or use `null` to autodetect
 };
 
-// Thiết lập ffmpeg để lấy dữ liệu từ camera USB (video0)
-const command = ffmpeg('/dev/video0')
-  .inputFormat('v4l2')
-  .format('mpeg1video')
-  .size('320x240') // Lower resolution
-  .fps(15) // Lower frame rate
-  .videoBitrate('500k') // Lower bitrate
-  .on('start', () => {
-    console.log('Đã bắt đầu streaming từ camera USB');
-  })
-  .on('error', (err) => {
-    console.error('Lỗi ffmpeg:', err.message);
+const webcam = NodeWebcam.create(webcamOpts);
+
+// Serve static HTML page to display camera feed
+app.get("/", (req, res) => {
+  res.sendFile(__dirname + "/index.html");
+});
+
+// Capture images and send to client every second
+io.on("connection", (socket) => {
+  console.log("New client connected");
+
+  const captureImage = () => {
+    NodeWebcam.capture("test", webcamOpts, (err, data) => {
+      if (err) return console.log(err);
+      socket.emit("image", { image: true, buffer: data.toString("base64") });
+    });
+  };
+
+  // Set interval to capture image every second
+  const intervalId = setInterval(captureImage, 1000);
+
+  // Cleanup on disconnect
+  socket.on("disconnect", () => {
+    console.log("Client disconnected");
+    clearInterval(intervalId);
   });
+});
 
-const ffstream = command.pipe();
-
-ffstream.on('data', (data) => {
-  wss.broadcast(data);
+// Start the server
+server.listen(3000, () => {
+  console.log("Server is running on http://localhost:3000");
 });

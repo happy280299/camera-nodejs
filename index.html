@@ -1,23 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Camera USB Stream</title>
+  <meta charset="UTF-8" />
+  <title>Camera Stream</title>
+  <style>
+    img {
+      width: 100%;
+      height: auto;
+    }
+  </style>
+  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-  <h1>USB Camera Stream</h1>
-  <img id="camera-feed" src="" width="640" height="480">
+  <h1>Camera Stream</h1>
+  <img id="camera" src="" alt="Camera Stream" />
   <script>
-    // Đặt IP của Raspberry Pi tại đây
-    const raspberryPiIP = '192.168.122.24'; // Thay bằng địa chỉ IP của Raspberry Pi
-    const ws = new WebSocket(`ws://${raspberryPiIP}:3000`);
+    const socket = io();
+    const camera = document.getElementById("camera");
 
-    const image = document.getElementById('camera-feed');
-
-    ws.onmessage = (event) => {
-      const blob = new Blob([event.data], { type: 'image/jpeg' });
-      image.src = URL.createObjectURL(blob);
-    };
+    socket.on("image", (data) => {
+      camera.src = "data:image/jpeg;base64," + data.buffer;
+    });
   </script>
 </body>
 </html>
